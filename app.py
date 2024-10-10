@@ -49,7 +49,10 @@ programs = {
     }
 }
 
-st.title("🩺 Test Schedule Timeline Visualization")
+st.markdown(
+    "<h1 style='text-align: center; color: #FF7F50;'>SiPhox New Pricing Test Schedule Timeline Visualization</h1>",
+    unsafe_allow_html=True
+)
 
 # Sidebar selections
 st.sidebar.header("Select Options")
@@ -273,9 +276,19 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Calculate and display total cost
 total_cost = price_per_panel * len(test_dates)
-st.markdown(f"<h3 style='text-align: center; color: {colors['text']};'>💰 Total Cost: ${total_cost:.2f} over {duration_months} months ({len(test_dates)} tests)</h3>", unsafe_allow_html=True)
+st.markdown(f"<h3 style='text-align: center; color: {colors['text']};'>💰 Uproft customer pays: ${total_cost:.2f} over {duration_months} months ({len(test_dates)} tests)</h3>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #FDF5E6;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# Optionally, display the data table
+
 if st.checkbox("Show Test Schedule Data"):
     df = pd.DataFrame({
         'Test Date': test_dates,
