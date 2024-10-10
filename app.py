@@ -14,17 +14,17 @@ start_date = datetime.date(2024, 10, 10)
 programs = {
     'CORE HEALTH': {
         'Test Monthly': {
-            'Pay as you go': {'price_per_panel': 225, 'period_months': 1, 'duration_months': 12},
+            'Pay as you go': {'price_per_panel': 225, 'period_months': 1},
             '6-month plan': {'price_per_panel': 115, 'period_months': 1, 'duration_months': 6},
             '12-month plan': {'price_per_panel': 99, 'period_months': 1, 'duration_months': 12},
         },
         'Test Quarterly': {
-            'Pay as you go': {'price_per_panel': 225, 'period_months': 3, 'duration_months': 12},
+            'Pay as you go': {'price_per_panel': 225, 'period_months': 3},
             '6-month plan': {'price_per_panel': 165, 'period_months': 3, 'duration_months': 6},
             '12-month plan': {'price_per_panel': 135, 'period_months': 3, 'duration_months': 12},
         },
         'Every 6 months': {
-            'Pay as you go': {'price_per_panel': 225, 'period_months': 6, 'duration_months': 24},
+            'Pay as you go': {'price_per_panel': 225, 'period_months': 6},
             '12-month plan': {'price_per_panel': 185, 'period_months': 6, 'duration_months': 12},
             '24-month plan': {'price_per_panel': 149, 'period_months': 6, 'duration_months': 24},
         },
@@ -34,12 +34,12 @@ programs = {
     },
     'Heart & Metabolic Program': {
         'Test Quarterly': {
-            'Pay as you go': {'price_per_panel': 297, 'period_months': 3, 'duration_months': 12},
+            'Pay as you go': {'price_per_panel': 297, 'period_months': 3},
             '6-month plan': {'price_per_panel': 225, 'period_months': 3, 'duration_months': 6},
             '12-month plan': {'price_per_panel': 195, 'period_months': 3, 'duration_months': 12},
         },
         'Every 6 months': {
-            'Pay as you go': {'price_per_panel': 297, 'period_months': 6, 'duration_months': 24},
+            'Pay as you go': {'price_per_panel': 297, 'period_months': 6},
             '12-month plan': {'price_per_panel': 245, 'period_months': 6, 'duration_months': 12},
             '24-month plan': {'price_per_panel': 220, 'period_months': 6, 'duration_months': 24},
         },
@@ -58,31 +58,70 @@ program_name = st.sidebar.selectbox("Program", list(programs.keys()))
 test_frequency = st.sidebar.selectbox("Test Frequency", list(programs[program_name].keys()))
 payment_plan = st.sidebar.selectbox("Payment Plan", list(programs[program_name][test_frequency].keys()))
 
-def calculate_schedule(program_name, test_frequency, payment_plan):
+# Initialize variable for custom duration
+custom_duration = None
+
+# Check if the selected payment plan is 'Pay as you go'
+if payment_plan.lower() == 'pay as you go':
+    custom_duration = st.sidebar.slider(
+        "Select Duration (Months)",
+        min_value=1,
+        max_value=24,
+        value=12,  # default value
+        step=1
+    )
+
+def calculate_schedule(program_name, test_frequency, payment_plan, custom_duration=None):
     plan = programs[program_name][test_frequency][payment_plan]
-    duration_months = plan['duration_months']
+    duration_months = plan.get('duration_months')  # Use get to handle missing keys
     period_months = plan['period_months']
     price_per_panel = plan['price_per_panel']
+    
+    # Override duration_months if custom_duration is provided
+    if custom_duration is not None:
+        duration_months = custom_duration
     
     if period_months == 0:
         # Just once
         test_dates = [start_date]
     else:
-        # Calculate number of tests, ensuring the last test is at duration_months
+        # Calculate number of tests without adding an extra one
         num_tests = duration_months // period_months
-        # If duration_months is exactly divisible by period_months, include the last test
-        if duration_months % period_months == 0:
-            num_tests += 1
-        test_dates = [start_date + relativedelta(months=period_months * i) for i in range(num_tests)]
+        test_dates = [
+            start_date + relativedelta(months=period_months * i) 
+            for i in range(num_tests)
+            if (start_date + relativedelta(months=period_months * i)) <= start_date + relativedelta(months=duration_months)
+        ]
     
     # Generate all month labels up to the maximum duration
     total_months = duration_months
-    all_months = [(start_date + relativedelta(months=i)).strftime('%b').upper() for i in range(total_months +1)]
+    all_months = [
+        (start_date + relativedelta(months=i)).strftime('%b').upper() 
+        for i in range(total_months + 1)
+    ]
     
-    return test_dates, price_per_panel, all_months
+    return test_dates, price_per_panel, all_months, duration_months
+
+def get_year_boundaries(start_date, duration_months):
+    """
+    Returns a dictionary with year numbers as keys and their corresponding month indices on the timeline.
+    """
+    boundaries = {}
+    current_year = start_date.year
+    for month in range(1, duration_months + 1):
+        date = start_date + relativedelta(months=month)
+        if date.month == 1:
+            boundaries[current_year + 1] = month
+            current_year += 1
+    return boundaries
 
 # Calculate the test schedule
-test_dates, price_per_panel, all_months = calculate_schedule(program_name, test_frequency, payment_plan)
+test_dates, price_per_panel, all_months, duration_months = calculate_schedule(
+    program_name, test_frequency, payment_plan, custom_duration
+)
+
+# Calculate year boundaries
+year_boundaries = get_year_boundaries(start_date, duration_months)
 
 # Create a new timeline figure using Plotly
 fig = go.Figure()
@@ -116,6 +155,25 @@ for i, month in enumerate(all_months):
         hoverinfo='none'
     ))
 
+# Add year boundary lines and labels
+for year, month_index in year_boundaries.items():
+    # Add a vertical dashed line to indicate the start of a new year
+    fig.add_shape(
+        type="line",
+        x0=month_index - 0.5, y0=-0.5, x1=month_index - 0.5, y1=1.5,
+        line=dict(color='gray', width=2, dash='dash')
+    )
+    
+    # Add a label for the year
+    fig.add_annotation(
+        x=month_index - 0.5, y=1.6,
+        text=str(year),
+        showarrow=False,
+        font=dict(size=12, color='gray'),
+        xanchor='center',
+        yanchor='bottom'
+    )
+
 # Add test markers and annotations
 for i, date in enumerate(test_dates):
     # Calculate the month index relative to the start date
@@ -143,6 +201,24 @@ for i, date in enumerate(test_dates):
             x0=len(all_months)-1, y0=0, x1=len(all_months)-1, y1=0,
             line=dict(color=colors['timeline'], width=10)
         )
+        # Recalculate year boundaries if new months extend into a new year
+        year_boundaries = get_year_boundaries(start_date, duration_months)
+        for year, month_index in year_boundaries.items():
+            if month_index - 0.5 not in [shape['x0'] for shape in fig.layout.shapes if shape['type'] == 'line']:
+                # Add the new year boundary lines and labels
+                fig.add_shape(
+                    type="line",
+                    x0=month_index - 0.5, y0=-0.5, x1=month_index - 0.5, y1=1.5,
+                    line=dict(color='gray', width=2, dash='dash')
+                )
+                fig.add_annotation(
+                    x=month_index - 0.5, y=1.6,
+                    text=str(year),
+                    showarrow=False,
+                    font=dict(size=12, color='gray'),
+                    xanchor='center',
+                    yanchor='bottom'
+                )
     
     if month_offset < len(all_months):
         fig.add_trace(go.Scatter(
@@ -157,7 +233,7 @@ for i, date in enumerate(test_dates):
         ))
         
         # Add custom icons
-        icon = '🧰' if i % 2 == 0 else '🧰'  # Alternating medical icons
+        icon = '🧰'   # Alternating medical icons
         fig.add_annotation(
             x=month_offset, y=1.5,
             text=icon,
@@ -168,12 +244,12 @@ for i, date in enumerate(test_dates):
 # Update layout for better visuals
 fig.update_layout(
     title=dict(
-        text=f"Test Schedule Timeline - {program_name}",
+        text=f"{program_name} - {test_frequency} - {payment_plan} ",
         font=dict(size=24, color=colors['text']),
-        x=0.5
+        x= 0.3
     ),
     showlegend=False,
-    height=500,
+    height=600,  # Increased height to accommodate year labels
     plot_bgcolor=colors['background'],
     paper_bgcolor=colors['background'],
     xaxis=dict(
@@ -188,6 +264,7 @@ fig.update_layout(
         zeroline=False,
         range=[-1, 2]
     ),
+    dragmode = False,
     margin=dict(l=20, r=20, t=100, b=20)
 )
 
@@ -196,7 +273,6 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Calculate and display total cost
 total_cost = price_per_panel * len(test_dates)
-duration_months = programs[program_name][test_frequency][payment_plan]['duration_months']
 st.markdown(f"<h3 style='text-align: center; color: {colors['text']};'>💰 Total Cost: ${total_cost:.2f} over {duration_months} months ({len(test_dates)} tests)</h3>", unsafe_allow_html=True)
 
 # Optionally, display the data table
@@ -206,5 +282,11 @@ if st.checkbox("Show Test Schedule Data"):
         'Cost': [price_per_panel] * len(test_dates)
     })
     df_display = df.copy()
-    df_display['Test Date'] = df_display['Test Date'].strftime('%Y-%m-%d')
+    
+    # Convert 'Test Date' to datetime if it's not already
+    df_display['Test Date'] = pd.to_datetime(df_display['Test Date'])
+    
+    # Format 'Test Date' as 'YYYY-MM-DD'
+    df_display['Test Date'] = df_display['Test Date'].dt.strftime('%Y-%m-%d')
+    
     st.dataframe(df_display.reset_index(drop=True))
