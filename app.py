@@ -313,7 +313,7 @@ total_cost = price_per_panel * len(test_dates)
 if program_name != "Ultimate Program":
     total_cost = price_per_panel * len(test_dates)
     st.markdown(f"<h3 style='text-align: center; color: {colors['text']};'>💰 Uproft customer pays: ${total_cost:.2f} for {duration_months} months ({len(test_dates)} tests)</h3>", unsafe_allow_html=True)
-    st.markdown(f"<h3 style='text-align: center; color: {colors['text']};'>🧰 Price per panel: {price_per_panel})</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center; color: {colors['text']};'>🧰 Price per panel: {price_per_panel}</h3>", unsafe_allow_html=True)
 
     st.markdown(
         """
